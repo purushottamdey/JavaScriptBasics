@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Withdrawal Projection (Monthly Compounding, INR)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f7fafc;
+        }
+        /* Custom scrollbar for the results table */
+        #results-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+        }
+        /* Style for the table header to stay fixed on scroll */
+        #resultsTable thead th {
+            position: sticky;
+            top: 0;
+            background-color: #4f46e5;
+            color: white;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex justify-center min-h-screen">
+
+    <div class="w-full max-w-5xl">
+        <h1 class="text-3xl font-extrabold text-indigo-700 mb-6 border-b pb-2">
+            Investment Withdrawal Planner (INR, Monthly Compounding)
+        </h1>
+
+        <!-- Input Panel -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Input 1: Lump Sum -->
+            <div class="flex flex-col">
+                <label for="lumpSum" class="text-sm font-medium text-gray-700 mb-1">Initial Lump Sum (₹)</label>
+                <input type="number" id="lumpSum" value="500000" min="0" step="1000" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 500000">
+            </div>
+
+            <!-- Input 2: Annual Interest Rate -->
+            <div class="flex flex-col">
+                <label for="annualInterest" class="text-sm font-medium text-gray-700 mb-1">Yearly Interest Rate (%)</label>
+                <input type="number" id="annualInterest" value="8.0" min="0.1" step="0.1" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 8.0">
+                <p class="text-xs text-gray-500 mt-1">Rate is credited monthly (Compounding).</p>
+            </div>
+
+            <!-- Input 3: Withdrawal Amount -->
+            <div class="flex flex-col">
+                <label for="withdrawalAmount" class="text-sm font-medium text-gray-700 mb-1">Periodic Withdrawal Amount (₹)</label>
+                <input type="number" id="withdrawalAmount" value="5000" min="0" step="100" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 5000">
+                <p class="text-xs text-gray-500 mt-1">This amount is deducted every period (e.g., ₹5,000 every 30 days).</p>
+            </div>
+
+            <!-- Input 4: Withdrawal Frequency (Days) -->
+            <div class="flex flex-col">
+                <label for="frequencyDays" class="text-sm font-medium text-gray-700 mb-1">Withdrawal Frequency (Days)</label>
+                <input type="number" id="frequencyDays" value="30" min="1" step="1" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 30 for monthly, 90 for quarterly">
+                <p class="text-xs text-gray-500 mt-1">The number of days between each withdrawal.</p>
+            </div>
+            
+            <!-- Input 5: Yearly Step-up Amount -->
+            <div class="flex flex-col">
+                <label for="yearlyStepUpAmount" class="text-sm font-medium text-gray-700 mb-1">Yearly Withdrawal Step-up Amount (₹)</label>
+                <input type="number" id="yearlyStepUpAmount" value="0" min="0" step="100" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 5000">
+                <p class="text-xs text-gray-500 mt-1">Fixed rupee amount added to withdrawal annually (e.g., due to inflation).</p>
+            </div>
+
+            <!-- Input 6: Monthly Step-up Amount -->
+            <div class="flex flex-col">
+                <label for="monthlyStepUpAmount" class="text-sm font-medium text-gray-700 mb-1">Monthly Withdrawal Step-up Amount (₹)</label>
+                <input type="number" id="monthlyStepUpAmount" value="0" min="0" step="10" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="e.g., 50">
+                <p class="text-xs text-gray-500 mt-1">Fixed rupee amount added to withdrawal every month.</p>
+            </div>
+
+            <!-- Input 7: Projection Years -->
+            <div class="flex flex-col md:col-span-2">
+                <label for="projectionYears" class="text-sm font-medium text-gray-700 mb-1">Projection Period (Years)</label>
+                <input type="number" id="projectionYears" value="5" min="1" max="50" step="1" class="p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                <p class="text-xs text-gray-500 mt-1">Enter your desired planning horizon (e.g., 3, 5, 10 years).</p>
+            </div>
+
+            <button onclick="calculateProjection()" class="md:col-span-2 mt-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
+                Run Monthly Projection
+            </button>
+            
+            <!-- LLM Feature Buttons -->
+            <button onclick="getFinancialSummary()" id="summaryBtn" disabled class="md:col-span-1 mt-2 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-opacity-50 disabled:opacity-50">
+                ✨ Get Financial Summary
+            </button>
+            <button onclick="getScenarioSuggestion()" id="scenarioBtn" disabled class="md:col-span-1 mt-2 py-3 bg-pink-600 text-white font-semibold rounded-lg shadow-md hover:bg-pink-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-pink-500 focus:ring-opacity-50 disabled:opacity-50">
+                ✨ Suggest Scenario
+            </button>
+        </div>
+        
+        <!-- No Interest Scenario Summary -->
+        <div id="noInterestSummary" class="mt-6 bg-blue-50 border border-blue-200 p-4 rounded-lg shadow-inner text-center hidden mb-6">
+            <p class="text-sm font-semibold text-blue-700"><span id="summaryYears">5-Year</span> Balance If 0% Interest Was Earned:</p>
+            <p id="noInterestResult" class="text-2xl font-bold text-blue-900 mt-1"></p>
+        </div>
+
+
+        <!-- LLM Analysis Display Area -->
+        <div id="analysisArea" class="hidden bg-yellow-50 border border-yellow-200 p-6 rounded-xl shadow-inner mb-8">
+            <h3 class="text-xl font-bold text-yellow-800 mb-3">AI Financial Insights</h3>
+            <div id="analysisContent" class="text-gray-700 leading-relaxed">
+                <!-- LLM output will go here -->
+            </div>
+            <div id="analysisLoading" class="hidden text-center mt-4">
+                <div class="animate-spin inline-block w-6 h-6 border-4 border-t-4 border-purple-500 border-opacity-50 rounded-full"></div>
+                <p class="text-purple-600 text-sm mt-2">Generating analysis...</p>
+            </div>
+        </div>
+
+        <!-- Results Display Area -->
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Monthly Projection Results</h2>
+
+        <div id="messageBox" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <strong class="font-bold">Error:</strong>
+            <span id="errorMessage" class="block sm:inline"></span>
+        </div>
+
+        <!-- Table Container -->
+        <div id="results-container" class="bg-white shadow-xl">
+            <table id="resultsTable" class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider">Month</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider">Start Value (₹)</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-green-700">Interest Earned (₹)</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider">Value After Interest (₹)</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-red-700">Deduction (₹)</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider">End Value (₹)</th>
+                        <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-blue-700">0% End Value (₹)</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100" id="resultsBody">
+                    <tr><td colspan="7" class="text-center py-4 text-gray-500">Enter your details and click 'Run Monthly Projection' to see the comparison.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global State for LLM context, updated after every calculation
+        let currentProjection = {
+            lumpSum: 0,
+            annualInterest: 0,
+            withdrawalAmount: 0,
+            frequencyDays: 0,
+            projectionYears: 0,
+            yearlyStepUpAmount: 0, 
+            monthlyStepUpAmount: 0, 
+            finalBalance: 0,
+            exhausted: false,
+            exhaustionMonth: null
+        };
+
+        // LLM API Constants
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // Helper for exponential backoff retry logic (Mandatory)
+        const fetchWithRetry = async (url, options, retries = 3) => {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 && i < retries - 1) {
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (i === retries - 1) {
+                        throw error;
+                    }
+                    const delay = Math.pow(2, i) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        };
+
+        // Helper function to format numbers as INR currency
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-IN', { 
+                style: 'currency',
+                currency: 'INR', 
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(amount).replace('₹', ''); 
+        };
+
+        // Custom modal function instead of alert()
+        const showMessage = (message, isError = true) => {
+            const messageBox = document.getElementById('messageBox');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            messageBox.className = isError
+                ? "bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
+                : "bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4";
+            messageBox.classList.remove('hidden');
+        };
+
+        // Function to set loading state for LLM buttons
+        const setLoading = (isLoading, btnId, defaultText) => {
+            const btn = document.getElementById(btnId);
+            const loadingDiv = document.getElementById('analysisLoading');
+            const analysisContent = document.getElementById('analysisContent');
+
+            if (isLoading) {
+                btn.disabled = true;
+                btn.textContent = '...Analyzing...';
+                analysisContent.innerHTML = '';
+                document.getElementById('analysisArea').classList.remove('hidden');
+                loadingDiv.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btn.textContent = defaultText;
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // --- LLM Feature 1: Financial Summary & Risk Analysis ---
+        async function getFinancialSummary() {
+            setLoading(true, 'summaryBtn', '✨ Get Financial Summary');
+
+            const { lumpSum, annualInterest, withdrawalAmount, frequencyDays, projectionYears, yearlyStepUpAmount, monthlyStepUpAmount, finalBalance, exhausted, exhaustionMonth } = currentProjection;
+            
+            const exhaustionDetails = exhausted 
+                ? `The fund was fully exhausted in Month ${exhaustionMonth} of the ${projectionYears}-year projection.`
+                : `The fund survived the ${projectionYears}-year period with a remaining balance of ₹${finalBalance.toFixed(2)}.`;
+
+            let stepUpDetail = "";
+            if (monthlyStepUpAmount > 0) {
+                stepUpDetail = `The periodic withdrawal amount increases every month by a fixed ₹${monthlyStepUpAmount}.`;
+            } else if (yearlyStepUpAmount > 0) {
+                stepUpDetail = `The periodic withdrawal amount increases annually by a fixed ₹${yearlyStepUpAmount}.`;
+            } else {
+                stepUpDetail = `The periodic withdrawal amount remains constant throughout the projection.`;
+            }
+
+            const prompt = `Analyze the following investment and withdrawal strategy (in Indian Rupees - INR) over a ${projectionYears}-year period:
+- Initial Lump Sum: ₹${lumpSum}
+- Annual Interest Rate: ${annualInterest}% (Compounded and credited monthly).
+- Initial Periodic Withdrawal Amount: ₹${withdrawalAmount}
+- Withdrawal Frequency: Every ${frequencyDays} days.
+- Withdrawal Adjustment: ${stepUpDetail}
+- Projection Outcome: ${exhaustionDetails}
+
+Provide a concise, single-paragraph summary of the strategy's sustainability, risk profile, and overall performance, specifically commenting on how the fixed amount step-up affects longevity. Focus on whether the withdrawal rate is sustainable given the monthly compounding interest rate.`;
+
+            const systemPrompt = "You are a professional, level-headed financial analyst based in India. Your response must be highly professional and objective. Provide a clear assessment of the plan's viability in a single paragraph, noting that the currency is INR. Do not use markdown formatting like headings or bold text in the response, only plain text.";
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Analysis failed to generate. Please try again.";
+                
+                document.getElementById('analysisContent').innerHTML = `
+                    <h4 class="font-bold text-gray-900 mb-2">Investment Sustainability Report</h4>
+                    <p>${text}</p>
+                `;
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showMessage("Could not connect to the analysis engine. Please check your network or try again.", true);
+                document.getElementById('analysisContent').innerHTML = `<p class="text-red-600">Failed to load analysis.</p>`;
+            } finally {
+                setLoading(false, 'summaryBtn', '✨ Get Financial Summary');
+            }
+        }
+
+        // --- LLM Feature 2: Scenario Suggestion ---
+        async function getScenarioSuggestion() {
+            setLoading(true, 'scenarioBtn', '✨ Suggest Scenario');
+
+            const { lumpSum, annualInterest, withdrawalAmount, frequencyDays, projectionYears, yearlyStepUpAmount, monthlyStepUpAmount, finalBalance, exhausted, exhaustionMonth } = currentProjection;
+
+            const exhaustionDetails = exhausted 
+                ? `The fund was fully exhausted in Month ${exhaustionMonth} of the ${projectionYears}-year projection.`
+                : `The fund survived the ${projectionYears}-year period with a remaining balance of ₹${finalBalance.toFixed(2)}.`;
+
+            let stepUpDetail = "";
+            if (monthlyStepUpAmount > 0) {
+                stepUpDetail = `The withdrawal amount increases every month by a fixed ₹${monthlyStepUpAmount}.`;
+            } else if (yearlyStepUpAmount > 0) {
+                stepUpDetail = `The withdrawal amount increases annually by a fixed ₹${yearlyStepUpAmount}.`;
+            } else {
+                stepUpDetail = `The withdrawal amount is constant.`;
+            }
+
+            const prompt = `Based on the following scenario (in INR) and outcome over a ${projectionYears}-year period, suggest ONE specific, actionable adjustment to the input parameters that would dramatically improve the outcome (e.g., ensure fund sustainability or maximize growth). The suggestion should be for a conservative investor who needs to combat inflation via a fixed amount increase.
+
+- Initial Lump Sum: ₹${lumpSum}
+- Annual Interest Rate: ${annualInterest}%
+- Initial Periodic Withdrawal Amount: ₹${withdrawalAmount}
+- Withdrawal Adjustment: ${stepUpDetail}
+- Outcome: ${exhaustionDetails}
+
+Provide the suggested adjustment clearly in one or two sentences. Focus on altering the initial withdrawal amount or the step-up amount to achieve better sustainability. Do not use markdown formatting like headings or bold text in the response, only plain text.`;
+
+            const systemPrompt = "You are an investment strategist focused on portfolio optimization for INR accounts. Provide a direct and actionable suggestion for the user to improve their plan.";
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Suggestion failed to generate. Please try again.";
+                
+                document.getElementById('analysisContent').innerHTML = `
+                    <h4 class="font-bold text-gray-900 mb-2">Optimization Suggestion</h4>
+                    <p>${text}</p>
+                `;
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showMessage("Could not connect to the analysis engine. Please check your network or try again.", true);
+                document.getElementById('analysisContent').innerHTML = `<p class="text-red-600">Failed to load suggestion.</p>`;
+            } finally {
+                setLoading(false, 'scenarioBtn', '✨ Suggest Scenario');
+            }
+        }
+
+
+        // Main calculation function
+        function calculateProjection() {
+            const lumpSum = parseFloat(document.getElementById('lumpSum').value);
+            const annualInterest = parseFloat(document.getElementById('annualInterest').value);
+            const withdrawalAmount = parseFloat(document.getElementById('withdrawalAmount').value);
+            const frequencyDays = parseInt(document.getElementById('frequencyDays').value);
+            const projectionYears = parseInt(document.getElementById('projectionYears').value);
+            const yearlyStepUpAmount = parseFloat(document.getElementById('yearlyStepUpAmount').value);
+            const monthlyStepUpAmount = parseFloat(document.getElementById('monthlyStepUpAmount').value);
+
+            const resultsBody = document.getElementById('resultsBody');
+            document.getElementById('messageBox').classList.add('hidden');
+            document.getElementById('analysisArea').classList.add('hidden'); 
+            resultsBody.innerHTML = ''; 
+
+            // --- Validation ---
+            if (isNaN(lumpSum) || lumpSum <= 0) return showMessage("Please enter a valid initial Lump Sum (₹).", true);
+            if (isNaN(annualInterest) || annualInterest < 0) return showMessage("Please enter a valid Yearly Interest Rate (0% or more).", true);
+            if (isNaN(withdrawalAmount) || withdrawalAmount < 0) return showMessage("Please enter a valid Periodic Withdrawal Amount (₹).", true);
+            if (isNaN(frequencyDays) || frequencyDays < 1) return showMessage("Please enter a valid Withdrawal Frequency in days (1 or more).", true);
+            if (isNaN(projectionYears) || projectionYears < 1) return showMessage("Please enter a valid Projection Period in years (1 or more).", true);
+            if (isNaN(yearlyStepUpAmount) || yearlyStepUpAmount < 0) return showMessage("Please enter a valid Yearly Step-up Amount (₹0 or more).", true);
+            if (isNaN(monthlyStepUpAmount) || monthlyStepUpAmount < 0) return showMessage("Please enter a valid Monthly Step-up Amount (₹0 or more).", true);
+            
+            // Check for conflicting step-up rates
+            if (yearlyStepUpAmount > 0 && monthlyStepUpAmount > 0) {
+                showMessage("Warning: Both monthly and yearly step-up amounts are set. The **Monthly Step-up Amount** will be prioritized and applied every month. The yearly amount will be ignored.", false);
+            }
+
+            // --- Calculation Setup ---
+            const totalMonths = projectionYears * 12;
+            const daysInMonth = 30; // Standardized for compounding and periodic tracking
+            const monthlyInterestRate = (annualInterest / 12) / 100;
+
+            let currentBalance = lumpSum;
+            let noInterestBalance = lumpSum; // Track the comparison balance
+            let currentPeriodicWithdrawal = withdrawalAmount; // This amount changes monthly/yearly due to step-up
+            let fundExhausted = false;
+            let exhaustionMonth = null;
+            let rows = [];
+            let daysTracker = 0; // Tracks days passed since the last withdrawal
+
+            // --- Initial Balance Row (Month 0) ---
+            rows.push(`
+                <tr class="bg-indigo-50 hover:bg-indigo-100 font-bold">
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">0 (Initial)</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-700">${formatCurrency(lumpSum)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-500">0.00</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-700">${formatCurrency(lumpSum)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-500">0.00</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-700">${formatCurrency(lumpSum)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-blue-700">${formatCurrency(lumpSum)}</td>
+                </tr>
+            `);
+
+            // --- Monthly Projection Loop ---
+            for (let month = 1; month <= totalMonths; month++) {
+                if (fundExhausted) break;
+
+                const startBalance = currentBalance;
+                
+                // 1. Calculate Interest for the month
+                const interestEarned = startBalance * monthlyInterestRate;
+                const balanceAfterInterest = startBalance + interestEarned; 
+
+                // 2. Determine if a periodic withdrawal is due this month
+                daysTracker += daysInMonth;
+                let actualWithdrawal = 0; // The amount actually withdrawn from the primary fund
+                let scheduledWithdrawal = 0; // The full amount scheduled for withdrawal this period (for 0% comparison)
+                
+                // Check if the cumulative days meets or exceeds the frequency
+                if (daysTracker >= frequencyDays) {
+                    scheduledWithdrawal = currentPeriodicWithdrawal; // Store the full amount
+                    actualWithdrawal = currentPeriodicWithdrawal; // Start with the full amount
+                    daysTracker -= frequencyDays; // Reset the tracker by the frequency
+                }
+                
+                let isExhaustedThisMonth = false;
+
+                // 3. Perform Deduction and Exhaustion Check (for the interest-bearing fund)
+                if (balanceAfterInterest < actualWithdrawal) {
+                    actualWithdrawal = balanceAfterInterest; // Only deduct what's available (capping)
+                    currentBalance = 0;
+                    fundExhausted = true;
+                    exhaustionMonth = month;
+                    isExhaustedThisMonth = true;
+                } else {
+                    currentBalance = balanceAfterInterest - actualWithdrawal; // End Value (Value - Deduction)
+                }
+
+                // 4. Update No-Interest Balance (simple principal depletion)
+                if (scheduledWithdrawal > 0) { // Only deduct if a withdrawal was scheduled
+                    noInterestBalance -= scheduledWithdrawal; // Deduct the FULL scheduled amount
+                    if (noInterestBalance < 0) {
+                        noInterestBalance = 0; 
+                    }
+                }
+
+                // 5. Apply Step-up for the NEXT month
+                if (!fundExhausted) {
+                    if (monthlyStepUpAmount > 0) {
+                        // Apply monthly step-up (prioritized)
+                        currentPeriodicWithdrawal += monthlyStepUpAmount;
+                    } else if (yearlyStepUpAmount > 0 && month % 12 === 0) {
+                        // Apply yearly step-up (at the end of months 12, 24, 36...)
+                        currentPeriodicWithdrawal += yearlyStepUpAmount;
+                    }
+                }
+
+                // 6. Determine Row Style and Text
+                let rowColor = 'bg-white';
+                let balanceColor = 'text-gray-900';
+                
+                if (isExhaustedThisMonth) {
+                    rowColor = 'bg-red-200';
+                    balanceColor = 'text-red-700 font-bold';
+                    showMessage(`The fund was exhausted in Month ${month} of the ${projectionYears}-year period.`, false);
+                } else if (currentBalance >= startBalance && currentBalance >= lumpSum) {
+                    rowColor = 'bg-green-50';
+                    balanceColor = 'text-green-800 font-semibold';
+                }
+
+                // 7. Log Monthly Summary Row
+                rows.push(`
+                    <tr class="${rowColor} hover:bg-gray-100">
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${month}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-500">${formatCurrency(startBalance)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-green-600 font-medium">${formatCurrency(interestEarned)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-700 font-medium">${formatCurrency(balanceAfterInterest)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-red-700">${formatCurrency(actualWithdrawal)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right ${balanceColor}">${formatCurrency(currentBalance)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right ${noInterestBalance === 0 ? 'text-red-500' : 'text-blue-700'}">${formatCurrency(noInterestBalance)}</td>
+                    </tr>
+                `);
+            }
+
+            // --- Update Global State for LLM ---
+            currentProjection = {
+                lumpSum,
+                annualInterest,
+                withdrawalAmount,
+                frequencyDays,
+                projectionYears,
+                yearlyStepUpAmount,
+                monthlyStepUpAmount,
+                finalBalance: currentBalance,
+                exhausted: fundExhausted,
+                exhaustionMonth: exhaustionMonth
+            };
+
+            // --- Final Summary Display (No Interest) ---
+            document.getElementById('summaryYears').textContent = `${projectionYears}-Year`;
+            document.getElementById('noInterestSummary').classList.remove('hidden');
+            const noInterestResultElement = document.getElementById('noInterestResult');
+            
+            // Recalculate deficit based on the *final* noInterestBalance
+            if (noInterestBalance <= 0) {
+                // If the balance ran out, calculate the total expected scheduled withdrawal amount
+                // to show the true deficit against the initial lump sum.
+                const totalWithdrawalPeriods = Math.floor((projectionYears * 365) / frequencyDays);
+                // Note: We use the simple initial withdrawal amount here for the deficit message simplicity
+                // but the actual calculation uses the stepped-up amounts (which is correct).
+                const totalWithdrawalExpected = totalWithdrawalPeriods * withdrawalAmount; 
+                const principalDeficit = Math.max(0, totalWithdrawalExpected - lumpSum); 
+
+                noInterestResultElement.classList.add('text-red-600');
+                noInterestResultElement.classList.remove('text-blue-900');
+                noInterestResultElement.innerHTML = `₹ ${formatCurrency(0)} (Deficit: ₹ ${formatCurrency(Math.abs(noInterestBalance))})`;
+            } else {
+                noInterestResultElement.classList.remove('text-red-600');
+                noInterestResultElement.classList.add('text-blue-900');
+                noInterestResultElement.innerHTML = `₹ ${formatCurrency(noInterestBalance)}`;
+            }
+
+            // Enable LLM buttons and display results
+            document.getElementById('summaryBtn').disabled = false;
+            document.getElementById('scenarioBtn').disabled = false;
+            resultsBody.innerHTML = rows.join('');
+            document.getElementById('results-container').scrollTop = 0; 
+        }
+
+        window.onload = () => {
+             document.getElementById('summaryBtn').disabled = true;
+             document.getElementById('scenarioBtn').disabled = true;
+        };
+    </script>
+</body>
+</html>
